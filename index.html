@@ -1,0 +1,222 @@
+
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>SPUNCAT ($SPUN) — Whitelist</title>
+<style>
+  :root{--bg:#0b1020;--card:#121833;--ink:#e7ecff;--muted:#9aa3c7;--good:#18c964;--bad:#ff5c7a}
+  *{box-sizing:border-box} body{margin:0;font-family:system-ui,Segoe UI,Roboto,Arial;background:var(--bg);color:var(--ink)}
+  .wrap{max-width:860px;margin:32px auto;padding:0 16px}
+  .card{background:#101638;border:1px solid #25306a;border-radius:16px;box-shadow:0 10px 30px #0006;overflow:hidden}
+  .top{padding:16px 20px;border-bottom:1px solid #1d2553;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .pill{background:#262f63;border:1px solid #344091;border-radius:999px;color:#cfd5ff;font-size:12px;padding:5px 10px}
+  .body{padding:18px 20px;display:grid;gap:14px}
+  h1{margin:0 0 6px;font-size:22px} p{margin:0;color:var(--muted)}
+  label{font-size:13px;color:#cfd5ff;margin-bottom:6px;display:block}
+  input[type="text"],input[type="email"]{width:100%;padding:12px;border-radius:10px;border:1px solid #2a326a;background:#0a1030;color:var(--ink);font-size:14px}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .actions{display:flex;flex-wrap:wrap;gap:10px}
+  .btn{cursor:pointer;border:1px solid #3b2cff;background:#6c55ff;color:#fff;font-weight:700;border-radius:10px;padding:10px 14px}
+  .btn.secondary{background:#121943;border-color:#2a326a}
+  .status{min-height:18px;font-size:13px;color:var(--muted)}
+  .ok{color:var(--good)} .err{color:var(--bad)}
+  .foot{padding:14px 20px;border-top:1px solid #1a214d;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .tiny{font-size:12px;color:var(--muted)}
+  .hidden{display:none!important}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <div class="top">
+      <span class="pill">SPUNCAT • $SPUN • Solana</span>
+      <span class="tiny">Wallets: Phantom • Solflare • Backpack • (MetaMask if Solana-enabled)</span>
+      <span style="flex:1"></span>
+      <span class="tiny" id="walletBadge">Wallet: Disconnected</span>
+    </div>
+
+    <div class="body">
+      <div>
+        <h1>Whitelist Sign-Up</h1>
+        <p>Connect a Solana wallet, sign to prove ownership (no gas), and submit.</p>
+      </div>
+
+      <div class="actions">
+        <button class="btn" id="btnPhantom">Connect Phantom</button>
+        <button class="btn" id="btnSolflare">Connect Solflare</button>
+        <button class="btn" id="btnBackpack">Connect Backpack</button>
+        <button class="btn secondary" id="btnMetaMask">Connect MetaMask (Solana)</button>
+        <button class="btn secondary" id="btnDisconnect" disabled>Disconnect</button>
+      </div>
+
+      <div class="row">
+        <div>
+          <label>Address</label>
+          <input id="addr" type="text" readonly placeholder="Not connected" />
+        </div>
+        <div>
+          <label>Detected wallets</label>
+          <input id="detected" type="text" readonly value="—" />
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label>Email (optional)</label>
+          <input id="email" type="email" placeholder="you@example.com" />
+        </div>
+        <div>
+          <label>Referral (optional)</label>
+          <input id="ref" type="text" placeholder="@username or code" />
+        </div>
+      </div>
+
+      <input id="favoriteColor" class="hidden" autocomplete="off" />
+
+      <div class="status" id="status"></div>
+
+      <div class="actions">
+        <label style="display:flex;gap:8px;align-items:flex-start;font-size:13px">
+          <input id="agree" type="checkbox" />
+          I agree my wallet address may be used to check eligibility for SPUNCAT airdrops & presale.
+        </label>
+      </div>
+
+      <div class="actions">
+        <button class="btn" id="btnSubmit" disabled>Sign & Join Whitelist</button>
+      </div>
+    </div>
+
+    <div class="foot">
+      <span class="tiny">v1.0 — Solana-only verification</span>
+      <span class="tiny" id="net">Network: —</span>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const $ = id => document.getElementById(id);
+  const badge = $('walletBadge'), status = $('status'), addr = $('addr'), net = $('net'), det = $('detected');
+  const agree = $('agree'), email = $('email'), ref = $('ref');
+  const btnSubmit = $('btnSubmit'), btnDisconnect = $('btnDisconnect');
+
+  let provider = null, walletName = null, address = null;
+
+  function s(msg, cls){ status.textContent = msg||''; status.className = 'status' + (cls?(' '+cls):''); }
+  function short(s){ return s ? s.slice(0,6)+'…'+s.slice(-4) : ''; }
+  function b64(u8){ let b=''; for(const c of u8) b+=String.fromCharCode(c); return btoa(b); }
+  function detect(){
+    const hasPhantom = !!(window.solana?.isPhantom) || !!(window.phantom?.solana);
+    const hasSolflare = !!(window.solflare?.isSolflare) || !!(window.solana?.isSolflare);
+    const hasBackpack = !!(window.backpack?.solana) || !!(window.solana?.isBackpack);
+    const hasMetaMaskSol = !!(window.ethereum?.solana || window.solana?.isMetaMask);
+    det.value = [hasPhantom?'Phantom':null,hasSolflare?'Solflare':null,hasBackpack?'Backpack':null,hasMetaMaskSol?'MetaMask(SOL)':''].filter(Boolean).join(', ') || 'None';
+  }
+  function setConnected(on){
+    btnSubmit.disabled = !on; btnDisconnect.disabled = !on;
+    badge.textContent = on ? `Wallet: ${walletName} ${short(address)}` : 'Wallet: Disconnected';
+    net.textContent = on ? `Network: Solana (${walletName})` : 'Network: —';
+    addr.value = on ? address : '';
+  }
+
+  function getProv(kind){
+    if(kind==='phantom'){ if(window.solana?.isPhantom) return window.solana; if(window.phantom?.solana) return window.phantom.solana; }
+    if(kind==='solflare'){ if(window.solflare?.isSolflare) return window.solflare; if(window.solana?.isSolflare) return window.solana; }
+    if(kind==='backpack'){ if(window.backpack?.solana) return window.backpack.solana; if(window.solana?.isBackpack) return window.solana; }
+    if(kind==='metamask'){ return window.ethereum?.solana || null; }
+    return null;
+  }
+
+  async function connect(kind){
+    try{
+      provider = getProv(kind);
+      if(!provider){ s(kind+' not detected. Install it and try again.','err'); return; }
+      walletName = kind;
+      const resp = provider.connect ? await provider.connect({ onlyIfTrusted:false }) : {};
+      address = (resp?.publicKey?.toString?.()) || (provider.publicKey?.toString?.());
+      if(!address){ s('No public key returned.','err'); return; }
+      setConnected(true); s('Connected. Ready to sign.','ok');
+    }catch(e){
+      const m=(e?.message||'').toLowerCase();
+      if(m.includes('reject')) s('User rejected the connection.','err');
+      else s('Connection failed: '+(e.message||e),'err');
+    } finally { detect(); }
+  }
+
+  async function solanaSignMessage(prov, bytes){
+    if(typeof prov.signMessage==='function'){
+      try{ const r=await prov.signMessage(bytes,'utf8'); return r?.signature? r.signature : r; }catch(e){}
+      try{ const r=await prov.signMessage(bytes); return r?.signature? r.signature : r; }catch(e){}
+    }
+    if(typeof prov.request==='function'){
+      const r=await prov.request({ method:'signMessage', params:{ message: Array.from(bytes), display:'utf8' }});
+      return r?.signature? r.signature : r;
+    }
+    throw new Error('Message signing not available.');
+  }
+
+  function buildMsg(ts, nonce){
+    return [
+      'Whitelist signup for SPUNCAT ($SPUN)',
+      'Domain: '+location.host,
+      'Origin: '+location.origin,
+      'Address: '+address,
+      'Network: SOLANA ('+walletName+')',
+      'Timestamp: '+ts,
+      'Nonce: '+nonce,
+      'Statement: I attest I control this address for SPUNCAT whitelist.'
+    ].join('\n');
+  }
+  function nonce(n=16){ const chars='abcdef0123456789'; let out=''; const a=new Uint8Array(n); crypto.getRandomValues(a); for(const v of a) out+=chars[v%chars.length]; return out; }
+  function validEmail(v){ const e=(v||'').trim(); if(!e) return true; return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e); }
+
+  async function submit(){
+    try{
+      if(!address) return s('Connect your wallet first.','err');
+      if(!agree.checked) return s('Please agree to the terms first.','err');
+      if(!validEmail(email.value)) return s('That email does not look valid.','err');
+      if(document.getElementById('favoriteColor').value) return s('Bot detected.','err');
+
+      const ts = new Date().toISOString();
+      const n = nonce();
+      const msg = buildMsg(ts,n);
+      const enc = new TextEncoder();
+      const sig = await solanaSignMessage(provider, enc.encode(msg));
+      const sigB64 = (sig instanceof Uint8Array) ? b64(sig) : (typeof sig==='string' && !sig.startsWith('0x') ? sig : null);
+
+      const payload = {
+        chain:'solana', wallet:walletName, address,
+        email: (email.value||'').trim(), referral: (ref.value||'').trim(),
+        ts, message: msg, signature_base64: sigB64
+      };
+
+      s('Submitting…');
+      const res = await fetch('/api/whitelist',{ method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+      if(!res.ok){ const t=await res.text(); throw new Error(t||'Server error'); }
+      s('Success! You are on the whitelist.','ok');
+    }catch(e){
+      const m=(e?.message||'').toLowerCase();
+      if(m.includes('not available')) s('Your wallet does not support message signing.','err');
+      else if(m.includes('reject')) s('Signature request was rejected.','err');
+      else s('Failed: '+(e.message||e),'err');
+    }
+  }
+
+  $('btnPhantom').onclick = ()=>connect('phantom');
+  $('btnSolflare').onclick = ()=>connect('solflare');
+  $('btnBackpack').onclick = ()=>connect('backpack');
+  $('btnMetaMask').onclick = ()=>connect('metamask');
+  $('btnDisconnect').onclick = async ()=>{
+    try{ if(provider?.disconnect) await provider.disconnect(); }catch(_){}
+    provider=null; walletName=null; address=null; setConnected(false); s('Disconnected.');
+  };
+  $('btnSubmit').onclick = submit;
+
+  detect(); setConnected(false);
+})();
+</script>
+</body>
+</html>
