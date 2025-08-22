@@ -42,6 +42,20 @@
         <h1>Whitelist Sign-Up</h1>
         <p>Connect a Solana wallet, sign to prove ownership (no gas), and submit.</p>
       </div>
+function isMobile(){ return /Mobi|Android/i.test(navigator.userAgent); }
+
+// Open this same page inside the Solflare app’s in-app browser (mobile)
+function openInSolflareApp(){
+  const t = encodeURIComponent(location.href);
+  const r = encodeURIComponent(location.origin);
+  location.href = `https://solflare.com/ul/v1/browse/${t}?ref=${r}`;
+}
+
+// Open inside Phantom app’s in-app browser (mobile)
+function openInPhantomApp(){
+  const t = encodeURIComponent(location.href);
+  location.href = `https://phantom.app/ul/browse?url=${t}`;
+}
 
       <div class="actions">
         <button class="btn" id="btnPhantom">Connect Phantom</button>
@@ -95,6 +109,10 @@
     </div>
   </div>
 </div>
+<script>
+  // Google Apps Script Web App /exec URL (the one you deployed)
+  const APPS_SCRIPT_URL = "https://script.google.com/macros/s/PASTE_YOUR_EXEC_URL/exec";
+</script>
 
 <script>
 (function(){
@@ -129,21 +147,32 @@
     if(kind==='metamask'){ return window.ethereum?.solana || null; }
     return null;
   }
+async function connect(kind){
+  try{
+    provider = getProv(kind);
 
-  async function connect(kind){
-    try{
-      provider = getProv(kind);
-      if(!provider){ s(kind+' not detected. Install it and try again.','err'); return; }
-      walletName = kind;
-      const resp = provider.connect ? await provider.connect({ onlyIfTrusted:false }) : {};
-      address = (resp?.publicKey?.toString?.()) || (provider.publicKey?.toString?.());
-      if(!address){ s('No public key returned.','err'); return; }
-      setConnected(true); s('Connected. Ready to sign.','ok');
-    }catch(e){
-      const m=(e?.message||'').toLowerCase();
-      if(m.includes('reject')) s('User rejected the connection.','err');
-      else s('Connection failed: '+(e.message||e),'err');
-    } finally { detect(); }
+    // If no provider injected and we’re on mobile, bounce into the wallet app’s browser
+    if(!provider && isMobile()){
+      if(kind==='solflare'){ s('Opening in the Solflare app…'); openInSolflareApp(); return; }
+      if(kind==='phantom'){  s('Opening in the Phantom app…');  openInPhantomApp();  return; }
+    }
+
+    if(!provider){ s(kind+' not detected. Install it and try again.','err'); return; }
+
+    walletName = kind;
+    const resp = provider.connect ? await provider.connect({ onlyIfTrusted:false }) : {};
+    address = (resp?.publicKey?.toString?.()) || (provider.publicKey?.toString?.());
+    if(!address){ s('No public key returned.','err'); return; }
+
+    setConnected(true); s('Connected. Ready to sign.','ok');
+  }catch(e){
+    const m=(e?.message||'').toLowerCase();
+    if(m.includes('reject')) s('User rejected the connection.','err');
+    else s('Connection failed: '+(e.message||e),'err');
+  } finally { detect(); }
+}
+
+  
   }
 
   async function solanaSignMessage(prov, bytes){
@@ -194,8 +223,14 @@
       };
 
       s('Submitting…');
-      const res = await fetch('/api/whitelist',{ method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
-      if(!res.ok){ const t=await res.text(); throw new Error(t||'Server error'); }
+    await fetch(APPS_SCRIPT_URL, {
+  method:'POST',
+  mode:'no-cors',                       // Apps Script often returns an opaque response
+  headers:{ 'Content-Type':'application/json' },
+  body: JSON.stringify(payload)
+});
+s('Success! You are on the whitelist.','ok');
+
       s('Success! You are on the whitelist.','ok');
     }catch(e){
       const m=(e?.message||'').toLowerCase();
@@ -220,3 +255,4 @@
 </script>
 </body>
 </html>
+
